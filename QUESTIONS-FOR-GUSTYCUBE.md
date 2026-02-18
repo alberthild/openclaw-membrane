@@ -1,100 +1,77 @@
 # Questions for GustyCube — OpenClaw Membrane Plugin
 
-Hey Bennett! We've finished the RFC and architecture draft for the OpenClaw plugin (`clients/openclaw/`). Before we start coding, we have some questions to make sure we're aligned.
+Hey Bennett! We've gone through the docs at membrane.gustycube.com and the RFC spec, and finished our architecture draft for the OpenClaw plugin (`clients/openclaw/`). Most things are clear — just a few questions before we start coding.
 
 ---
 
-## 1. TypeScript Client Publishing
+## 1. Consolidation: Coexistence or Replacement?
 
-The plugin imports from `clients/typescript/` for gRPC types and the client wrapper.
+Your docs show consolidation already runs on a 6h interval with 4 sub-consolidators (episodic compression → semantic → competence → plan graph). Our plugin adds LLM-enhanced consolidation on top.
 
-- **Is the TS client published to npm** (e.g. `@gustycube/membrane-client`)? If not, are you planning to?
-- If it's not published yet: should we **vendor the types** into the plugin for now, or would you prefer we help set up npm publishing for `clients/typescript/` as part of this PR?
-- What's the **import path** we should use in the monorepo? We assumed `../../typescript/client.js` — is that correct?
+- Should we **disable Membrane's built-in consolidation** (`consolidation_interval: 0`?) and own the full pipeline? Or run both side by side?
+- If side by side: is there a **lock or mutex** to prevent both from writing at the same time?
+- Would you accept a **consolidation callback/hook** in `membraned` so it delegates to our plugin instead of its internal logic? Cleaner than timer-based polling.
 
-## 2. Consolidation Architecture
+## 2. Working State — Thread ID Semantics
 
-Membrane's consolidation pipeline (episodic → semantic/competence) is currently a pattern-matching stub. Our plugin replaces this with LLM-enhanced batch processing.
+`IngestWorkingState` requires a `thread_id`. In OpenClaw we have:
+- **Session Key** (e.g. `agent:main:main`) — stable across restarts
+- **Session ID** (UUID) — unique per lifecycle
 
-- Would you accept a **consolidation callback/webhook** in `membraned`? The idea: our plugin registers as the external consolidator, and Membrane invokes it instead of its internal stub. This is cleaner than our current approach (timer-based polling via `Retrieve`).
-- Alternatively: should we just **disable Membrane's internal consolidation** entirely and own the full pipeline from the plugin side?
-- Is there a **consolidation lock** or flag we should respect to avoid both systems running simultaneously?
+We'd use Session Key. Does `thread_id` affect **retrieval grouping or decay**? Or is it purely organizational?
 
-## 3. Health Check
+## 3. Sidecar Binary Distribution
 
-We currently probe the sidecar via `GetMetrics()` as a health check. This works but it's not ideal.
+We want to auto-download `membraned` from GitHub releases on first plugin start.
 
-- Would you consider adding **standard gRPC health check** (`grpc.health.v1.Health`) to `membraned`?
-- Or is there a **lighter endpoint** we missed that's better suited for health probes?
-- What's the expected **startup time** for `membraned`? We currently retry health checks 10x with 500ms intervals (5 seconds total). Is that enough?
+- **Are you publishing release binaries?** What's the naming convention? We assumed `membrane-{version}-{os}-{arch}.tar.gz`
+- **Platforms:** Do you build for `linux-amd64`, `linux-arm64`, `darwin-arm64`?
+- **Checksums** alongside releases?
+- Or would you prefer a `go install github.com/GustyCube/membrane/cmd/membraned@latest` approach?
 
-## 4. Working State & Thread IDs
+## 4. Sensitivity Bug
 
-`IngestWorkingState` requires a `threadId`. In OpenClaw, we have multiple ID concepts:
+Our code audit found that `SensitivityLevel()` returns `-1` for unknown values — which bypasses trust gates (anything < 0 passes all `<=` checks).
 
-- **Session Key** (e.g. `agent:main:main`) — identifies the agent session
-- **Session ID** (UUID) — unique per session lifecycle
-- **Cortex Thread ID** — conversation topic thread (if cortex plugin is active)
+We noticed the valid levels are: `public`(0), `low`(1), `medium`(2), `high`(3), `hyper`(4).
 
-**Which should we use as `threadId`?** Our current plan is Session Key, but we want to make sure this plays well with Membrane's retrieval and decay logic. Does `threadId` affect how records are grouped or decayed?
+- **Known issue?** Would you accept a PR that defaults unknown sensitivity to `hyper` (most restrictive) instead of `-1`?
 
-## 5. Sidecar Binary Distribution
+## 5. Batch Ingestion
 
-Our plan: auto-download from GitHub releases on first run.
+Our consolidation produces 10-50 records per cycle. Currently we'd call `IngestObservation` / `IngestToolOutput` one by one.
 
-- **Are you publishing release binaries** on GitHub? If yes, what's the naming convention? We assumed: `membrane-{version}-{os}-{arch}.tar.gz`
-- Which **platforms** are you building for? We need at minimum: `linux-amd64`, `linux-arm64`, `darwin-arm64`
-- Is there a **checksum file** alongside releases for verification?
-- Would you prefer we use a **Go install** approach instead (`go install github.com/GustyCube/membrane/cmd/membraned@latest`)? That would require Go on the user's machine though.
+- Any interest in an **`IngestBatch(records[])`** RPC to reduce round-trips? Not a blocker for v0.1.0, but nice for performance.
 
-## 6. Sensitivity / Trust Model
+## 6. Scale & Pruning
 
-The Cerberus code audit flagged a **CRITICAL**: `SensitivityLevel()` returns -1 for unknown values, which bypasses all trust gates.
+Your docs say decay auto-prunes when salience drops below threshold, and episodic memory is append-only.
 
-- Is this a **known issue** or something you'd like us to file?
-- Our plugin always sets explicit sensitivity values (`low`, `medium`, `high`, `critical`) — so we're safe on our end. But other clients could send invalid values.
-- **Suggestion:** Return `critical` (most restrictive) as default for unknown sensitivity, rather than -1. Would you accept a PR for that?
-
-## 7. Batch Ingestion
-
-Our consolidation pipeline may produce 10-50 records per cycle. Currently we'd call `IngestObservation` / `IngestToolOutput` individually.
-
-- Would you consider adding **`IngestBatch(records[])`** to reduce gRPC round-trips?
-- Not a blocker for v0.1.0, but would be nice for performance.
-
-## 8. Record Limits & Pruning
-
-- Is there a **maximum record count** before performance degrades? We're running ~245k events in our NATS store — Membrane won't see all of those, but we want to understand the scale.
-- How does **pruning** work in practice? When salience drops below threshold, are records deleted or just hidden from retrieval?
+- Is there a **practical record count limit** before SQLite performance degrades? We run ~245k events in NATS — Membrane won't see all of those, but want to understand the ceiling.
 - Can we configure **per-type retention limits** (e.g. max 1000 episodic, unlimited semantic)?
 
-## 9. Monorepo Build Integration
+---
 
-- What's your **build system**? We saw Go modules for the server — is there a top-level Makefile or build script?
-- Should `clients/openclaw/` have its own **CI workflow** (`.github/workflows/test-openclaw.yml`) or integrate into an existing one?
-- Any **linting/formatting** conventions we should follow for the TypeScript code?
+## Already Answered (from your docs)
 
-## 10. Existing Tests & Mocking
+For reference — we found answers to these in your documentation:
 
-- Does `clients/typescript/` have **integration tests** against a real `membraned` instance? If so, how do you run them?
-- Is there a **mock gRPC server** or test fixtures we can reuse, or should we build our own?
-- Any **proto file changes** planned for the near future that might affect our hook mapping?
+- ✅ **TS Client**: Published as `@gustycube/membrane` on npm — we'll use that directly
+- ✅ **Health Check**: `GetMetrics()` works, we'll use it (startup retry: 10x 500ms)
+- ✅ **Build System**: `make build`, Go modules, YAML config
+- ✅ **Security**: SQLCipher + TLS + Bearer token auth + rate limiting — solid
+- ✅ **Sensitivity Levels**: `public` / `low` / `medium` / `high` / `hyper` (5 levels, not 4)
+
+## Non-Blocking FYI
+
+- Plugin lives in `clients/openclaw/`, npm scope `@vainplex/openclaw-membrane`
+- License: MIT (matching Membrane)
+- LLM consolidation is opt-in — regex extraction works without any LLM
+- We don't touch Membrane's Go code in v0.1.0 — pure client-side plugin
+- Hook priorities: we run before cortex (priority 5 vs 10) for context injection
 
 ---
 
-## Non-Blocking, Just FYI
-
-These are things we've already decided but want you to be aware of:
-
-- **Plugin lives in `clients/openclaw/`** alongside the TS client
-- **npm scope:** `@vainplex/openclaw-membrane` — our publishing pipeline
-- **License:** MIT (matching Membrane)
-- **Hook priorities:** We run before cortex (priority 5 vs 10) for session_start context injection
-- **LLM consolidation is opt-in** — regex extraction works without any LLM
-- **We don't touch Membrane's Go code** in v0.1.0 — pure client-side plugin
-
----
-
-Let us know what works, what needs changing, and which questions are blockers vs. nice-to-have. Happy to hop on a call if easier.
+Let us know which questions are blockers vs. nice-to-have. Happy to hop on a call if easier.
 
 — Albert (Vainplex)
