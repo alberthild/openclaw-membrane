@@ -1,8 +1,8 @@
 {
   "name": "@vainplex/openclaw-membrane",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "type": "module",
-  "description": "Membrane bridge for OpenClaw",
+  "description": "Membrane gRPC bridge for OpenClaw — episodic memory ingestion, search tool, and auto-context injection via Membrane sidecar",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -22,13 +22,32 @@
     "typescript": "^5.9.3",
     "vitest": "^1.0.0"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "openclaw",
+    "membrane",
+    "grpc",
+    "episodic-memory",
+    "plugin",
+    "agent-memory"
+  ],
+  "author": "Vainplex <dev@vainplex.de>",
+  "license": "MIT",
   "openclaw": {
     "id": "openclaw-membrane",
     "extensions": [
       "./dist/index.js"
     ]
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alberthild/openclaw-membrane"
+  },
+  "homepage": "https://github.com/alberthild/openclaw-membrane#readme",
+  "files": [
+    "dist/",
+    "assets/",
+    "openclaw.plugin.json",
+    "README.md",
+    "CHANGELOG.md"
+  ]
 }

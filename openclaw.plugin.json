@@ -1,17 +1,16 @@
 {
   "id": "openclaw-membrane",
   "name": "@vainplex/openclaw-membrane",
-  "version": "0.1.0",
-  "description": "Membrane bridge for OpenClaw",
-  "entry": "index.ts",
-  "config": {
-    "grpc_endpoint": "localhost:50051",
-    "buffer_size": 1000,
-    "default_sensitivity": "low"
-  },
+  "description": "Membrane gRPC bridge for OpenClaw — episodic memory ingestion, search tool, and auto-context injection",
+  "version": "0.3.0",
   "configSchema": {
     "type": "object",
+    "additionalProperties": true,
     "properties": {
+      "enabled": {
+        "type": "boolean",
+        "default": true
+      },
       "grpc_endpoint": {
         "type": "string",
         "default": "localhost:50051"
@@ -22,9 +21,30 @@
       },
       "default_sensitivity": {
         "type": "string",
-        "default": "low"
+        "default": "low",
+        "enum": ["public", "low", "medium", "high", "hyper"]
+      },
+      "retrieve_enabled": {
+        "type": "boolean",
+        "default": true
+      },
+      "retrieve_limit": {
+        "type": "number",
+        "default": 5
+      },
+      "retrieve_min_salience": {
+        "type": "number",
+        "default": 0.1
+      },
+      "retrieve_max_sensitivity": {
+        "type": "string",
+        "default": "medium",
+        "enum": ["public", "low", "medium", "high", "hyper"]
+      },
+      "retrieve_timeout_ms": {
+        "type": "number",
+        "default": 2000
       }
     }
-  },
-  "capabilities": ["event_subscription"]
+  }
 }
