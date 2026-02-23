@@ -220,12 +220,31 @@ npx vitest run        # Run all 44 tests
 npx vitest --watch    # Watch mode
 ```
 
-## Membrane Resources
+## Known Limitations
 
-- [GustyCube/membrane](https://github.com/GustyCube/membrane) — The memory substrate (Go, 7.2k LOC)
-- [Membrane RFC](https://github.com/GustyCube/membrane/blob/main/RFC.md) — 849-line specification
-- Memory types: episodic (timeline), semantic (SPO triples), competence (learned patterns), working (task state)
-- Revision operations: supersede, fork, retract, contest, merge
+**Be honest about what this can and can't do today:**
+
+- **No fulltext search.** Membrane's Retrieve ranks by salience/recency/decay, not text content. If you search for "pipeline", it won't find records containing "pipeline" — it returns whatever has highest salience. This gets better over time as rehearsal boosts relevant records, but early on results can feel random.
+- **Backfilled records don't benefit from decay.** If you bulk-import history, all records start with identical salience and no access history. Membrane's biological memory model needs organic growth — records written through real conversations develop natural salience patterns.
+- **Single memory slot in OpenClaw.** The `before_agent_start` hook only fires for the active memory plugin. If you use `memory-lancedb` (default), Membrane's auto-context injection won't fire. The `membrane_search` tool works regardless.
+- **No vector/semantic search.** Membrane doesn't have embedding-based search yet. The `membrane_search` tool queries via gRPC Retrieve which uses salience-based ranking. For fulltext needs, use the bundled `scripts/membrane-search.sh` (SQL LIKE queries directly on the SQLite DB).
+- **Consolidation is early.** Membrane runs consolidation every 6h with 4 sub-consolidators, but the quality of merged records depends on your data volume and patterns.
+- **SQLite scaling.** Works well up to ~100k records. Beyond that, query performance may degrade. No sharding or distributed mode.
+
+## Membrane — Credit & Collaboration
+
+This plugin bridges [GustyCube/membrane](https://github.com/GustyCube/membrane), created by **Bennett Schwartz** ([@GustyCube](https://github.com/GustyCube)).
+
+Membrane is the memory substrate — a Go-based gRPC service (7.2k LOC) implementing biological memory dynamics: episodic timeline, semantic facts, competence learning, working memory, salience decay, and revision operations (supersede/fork/retract/contest/merge). The [RFC specification](https://github.com/GustyCube/membrane/blob/main/RFC.md) (849 lines) is one of the best-documented agent memory specs we've seen.
+
+This plugin is the **bridge layer** — it handles OpenClaw event mapping, buffered ingestion, search tooling, and context injection. Membrane does the heavy lifting on storage, decay math, and memory consolidation.
+
+We're exploring joint development with GustyCube — Vainplex brings plugin infrastructure + LLM enhancement + production experience, GustyCube brings the storage backend + revision system + decay math.
+
+- **Membrane docs:** [membrane.gustycube.com](https://membrane.gustycube.com)
+- **TS Client:** `@gustycube/membrane` on npm
+- **Memory types:** episodic (timeline), semantic (SPO triples), competence (learned patterns), working (task state)
+- **Revision ops:** supersede, fork, retract, contest, merge
 
 ## Vainplex OpenClaw Plugin Suite
 
