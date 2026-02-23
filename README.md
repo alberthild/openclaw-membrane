@@ -2,54 +2,158 @@
 
 Membrane gRPC bridge for OpenClaw — persistent episodic memory via [GustyCube/membrane](https://github.com/GustyCube/membrane) sidecar.
 
-## Features
+**What it does:** Every conversation, tool call, and decision flows into Membrane's biological memory model. Memories decay over time. Frequently accessed ones grow stronger. Your agent remembers what matters and forgets what doesn't.
 
-- **Event Ingestion** — Writes OpenClaw events (messages, tool calls, facts, outcomes) to Membrane via gRPC
-- **`membrane_search` Tool** — LLM-callable tool for episodic memory queries (gRPC Retrieve with rehearsal)
-- **Auto-Context Injection** — `before_agent_start` hook injects `<membrane-context>` into system prompt
-- **Reliability Buffer** — Ring buffer with retry logic, exponential backoff, and max 10 retries
-- **All 4 Memory Types** — Parses episodic, semantic, competence, and working memory
+## Quick Start
 
-## Installation
+### 1. Run Membrane sidecar
 
 ```bash
+# Docker (recommended)
+docker run -d --name membrane \
+  -p 50051:50051 \
+  -v membrane-data:/data \
+  openclaw-membrane:local \
+  membraned -config /app/config.yaml
+
+# Or use docker-compose (see below)
+```
+
+<details>
+<summary>docker-compose.yml</summary>
+
+```yaml
+services:
+  membrane:
+    image: openclaw-membrane:local
+    container_name: membrane
+    ports:
+      - "50051:50051"
+    volumes:
+      - ./data:/data:rw
+      - ./config.yaml:/app/config.yaml:ro
+    entrypoint: ["membraned", "-config", "/app/config.yaml"]
+    restart: unless-stopped
+```
+
+Minimal `config.yaml`:
+```yaml
+listen_addr: ":50051"
+db_path: "/data/membrane.db"
+storage_backend: "sqlite"
+log_level: "info"
+```
+</details>
+
+### 2. Install the plugin
+
+```bash
+# From npm
+cd ~/.openclaw/extensions
+mkdir openclaw-membrane && cd openclaw-membrane
 npm install @vainplex/openclaw-membrane
+
+# Or from source
+git clone https://github.com/alberthild/openclaw-membrane.git
+cd openclaw-membrane
+npm install && npx tsc
+cp -r dist/ ~/.openclaw/extensions/openclaw-membrane/dist/
+cp openclaw.plugin.json package.json ~/.openclaw/extensions/openclaw-membrane/
+cd ~/.openclaw/extensions/openclaw-membrane && npm install --production
 ```
 
-Or install from source:
-```bash
-cd ~/.openclaw/extensions/openclaw-membrane
-npm install
-```
+### 3. Enable in OpenClaw
 
-## Prerequisites
-
-- [Membrane sidecar](https://github.com/GustyCube/membrane) running (Docker or native)
-- gRPC endpoint accessible (default: `localhost:50051`)
-
-## Configuration
-
-### openclaw.json
-
+Add to your `openclaw.json`:
 ```json
 {
   "plugins": {
     "entries": {
       "openclaw-membrane": {
-        "enabled": true
+        "enabled": true,
+        "config": {
+          "grpc_endpoint": "localhost:50051"
+        }
       }
     }
   }
 }
 ```
 
-### External Config
+### 4. Restart gateway
+
+```bash
+openclaw doctor --fix
+openclaw gateway restart
+```
+
+### 5. Verify
+
+Check gateway logs for:
+```
+[membrane] Registered bridge to localhost:50051
+```
+
+Send a message — it should appear as a Membrane record. Use the `membrane_search` tool to query:
+```
+membrane_search("what did we discuss yesterday")
+```
+
+## Features
+
+| Feature | Description |
+|---------|-------------|
+| **Event Ingestion** | Writes messages, tool calls, facts, and outcomes to Membrane via gRPC |
+| **`membrane_search` Tool** | LLM-callable search — each query boosts salience of matched records (rehearsal) |
+| **Auto-Context** | `before_agent_start` hook injects `<membrane-context>` into the system prompt |
+| **Reliability Buffer** | Ring buffer with exponential backoff, max 10 retries, graceful shutdown flush |
+| **4 Memory Types** | Parses episodic (timeline), semantic (SPO facts), competence (patterns), working (state) |
+
+## How it works
+
+```
+                         WRITE PATH
+OpenClaw Events ──→ mapping.ts ──→ buffer.ts ──→ gRPC IngestEvent ──→ Membrane DB
+                                                                          │
+                         READ PATH                                        │
+User Prompt ──→ before_agent_start hook ──→ gRPC Retrieve ──→ parser.ts ──┘
+                                                    │
+                                              <membrane-context>
+                                            injected into prompt
+                         
+                         SEARCH PATH
+LLM calls membrane_search ──→ gRPC Retrieve ──→ parser.ts ──→ formatted results
+                                    │
+                              salience boosted
+                             (rehearsal effect)
+```
+
+**Write path:** Every OpenClaw event (message in/out, tool call, fact extraction, task outcome) is mapped to a Membrane gRPC call and queued in a ring buffer. Failed calls retry with exponential backoff.
+
+**Read path:** Before each agent turn, the plugin calls Membrane's Retrieve with the user prompt. Matching records are parsed, filtered (prioritizing user/assistant messages over tool calls), and injected as `<membrane-context>`.
+
+**Search path:** The `membrane_search` tool lets the LLM explicitly query Membrane. Each Retrieve call triggers Membrane's rehearsal mechanism — accessed memories gain salience and resist decay.
+
+## Event Mapping
+
+| OpenClaw Event | Membrane Method | Memory Kind |
+|---------------|----------------|-------------|
+| `message_received` | IngestEvent | user_message |
+| `message_sent` | IngestEvent | assistant_message |
+| `session_start` | IngestEvent | session_init |
+| `after_tool_call` | IngestToolOutput | tool_call |
+| `fact_extracted` | IngestObservation | semantic |
+| `task_completed` | IngestOutcome | outcome |
+
+## Configuration
+
+### External Config (recommended)
 
 Create `~/.openclaw/plugins/openclaw-membrane/config.json`:
 
 ```json
 {
-  "grpc_endpoint": "localhost:50052",
+  "grpc_endpoint": "localhost:50051",
   "buffer_size": 1000,
   "default_sensitivity": "low",
   "retrieve_enabled": true,
@@ -60,62 +164,78 @@ Create `~/.openclaw/plugins/openclaw-membrane/config.json`:
 }
 ```
 
+### Config Reference
+
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `grpc_endpoint` | string | `localhost:50051` | Membrane gRPC address |
-| `buffer_size` | number | `1000` | Ring buffer capacity for event queue |
-| `default_sensitivity` | string | `low` | Default sensitivity for events |
-| `retrieve_enabled` | boolean | `true` | Enable auto-context injection hook |
-| `retrieve_limit` | number | `5` | Max memories to inject per turn |
-| `retrieve_min_salience` | number | `0.1` | Minimum salience threshold for Retrieve |
-| `retrieve_max_sensitivity` | string | `medium` | Max sensitivity level for Retrieve |
-| `retrieve_timeout_ms` | number | `2000` | gRPC Retrieve timeout in ms |
+| `buffer_size` | number | `1000` | Ring buffer capacity |
+| `default_sensitivity` | string | `low` | Default event sensitivity (`public`/`low`/`medium`/`high`/`hyper`) |
+| `retrieve_enabled` | boolean | `true` | Enable auto-context injection |
+| `retrieve_limit` | number | `5` | Max memories per turn |
+| `retrieve_min_salience` | number | `0.1` | Min salience for Retrieve |
+| `retrieve_max_sensitivity` | string | `medium` | Max sensitivity for Retrieve |
+| `retrieve_timeout_ms` | number | `2000` | Retrieve timeout in ms |
+
+### Sensitivity Model
+
+Events are classified by sensitivity based on context:
+
+| Condition | Sensitivity |
+|-----------|------------|
+| Credential/auth events | `hyper` |
+| DM / private channel | `medium` |
+| Tool calls | `medium` |
+| Default | config value (`low`) |
+| Invalid/unknown | `hyper` (secure fallback) |
 
 ### Authentication
 
-Set `MEMBRANE_API_KEY` environment variable for gRPC auth (optional, depends on Membrane config).
+Set `MEMBRANE_API_KEY` environment variable if your Membrane instance requires auth.
 
 ## Architecture
 
 ```
-OpenClaw Events → mapping.ts → buffer.ts → gRPC IngestEvent → Membrane
-                                                                    ↓
-User Prompt → index.ts (hook) → gRPC Retrieve → parser.ts → <membrane-context>
-                                                                    ↓
-LLM Tool Call → index.ts (tool) → gRPC Retrieve → parser.ts → Results
+openclaw-membrane/
+├── index.ts        # Plugin entry: wiring, tool + hook registration (248 LOC)
+├── types.ts        # TypeScript interfaces, config defaults (132 LOC)
+├── parser.ts       # Shared record parser, all 4 memory types (136 LOC)
+├── mapping.ts      # Event → gRPC payload mapping, 6 types (151 LOC)
+├── buffer.ts       # Ring buffer + reliability manager (120 LOC)
+├── client.ts       # gRPC client wrapper (71 LOC)
+├── test/
+│   ├── parser.test.ts    # 15 tests
+│   ├── mapping.test.ts   # 15 tests
+│   ├── buffer.test.ts    # 6 tests
+│   └── config.test.ts    # 8 tests
+└── assets/proto/         # Membrane gRPC proto definitions
 ```
 
-**Modules:**
-| File | Lines | Purpose |
-|------|-------|---------|
-| `index.ts` | 248 | Plugin entry, wiring, tool + hook registration |
-| `types.ts` | 132 | TypeScript interfaces and config defaults |
-| `parser.ts` | 136 | Shared Membrane record parser (all 4 types) |
-| `mapping.ts` | 151 | OpenClaw event → Membrane gRPC payload mapping |
-| `buffer.ts` | 120 | Ring buffer + reliability manager with retries |
-| `client.ts` | 71 | gRPC client wrapper |
+**Total:** 858 LOC source, 44 tests, 0 `any`.
 
 ## Tests
 
 ```bash
-npx vitest run
+npx vitest run        # Run all 44 tests
+npx vitest --watch    # Watch mode
 ```
 
-**44 tests** across 4 files:
-- `test/parser.test.ts` — 15 tests (record parsing, all memory types, edge cases)
-- `test/mapping.test.ts` — 15 tests (sensitivity, event mapping, all 6 types)
-- `test/buffer.test.ts` — 6 tests (ring buffer, retry, flush)
-- `test/config.test.ts` — 8 tests (validation, type rejection, defaults)
+## Membrane Resources
+
+- [GustyCube/membrane](https://github.com/GustyCube/membrane) — The memory substrate (Go, 7.2k LOC)
+- [Membrane RFC](https://github.com/GustyCube/membrane/blob/main/RFC.md) — 849-line specification
+- Memory types: episodic (timeline), semantic (SPO triples), competence (learned patterns), working (task state)
+- Revision operations: supersede, fork, retract, contest, merge
 
 ## Vainplex OpenClaw Plugin Suite
 
-| # | Plugin | npm | Status |
-|---|--------|-----|--------|
-| 1 | [@vainplex/openclaw-nats-eventstore](https://github.com/alberthild/openclaw-nats-eventstore) | `@vainplex/openclaw-nats-eventstore` | ✅ Published |
-| 2 | [@vainplex/openclaw-cortex](https://github.com/alberthild/openclaw-cortex) | `@vainplex/openclaw-cortex` | ✅ Published |
-| 3 | [@vainplex/openclaw-governance](https://github.com/alberthild/openclaw-governance) | `@vainplex/openclaw-governance` | ✅ Published |
-| 4 | [@vainplex/openclaw-knowledge-engine](https://github.com/alberthild/openclaw-knowledge-engine) | `@vainplex/openclaw-knowledge-engine` | ✅ Published |
-| 5 | **@vainplex/openclaw-membrane** | `@vainplex/openclaw-membrane` | 🆕 This plugin |
+| # | Plugin | Version | Tests | Description |
+|---|--------|---------|-------|-------------|
+| 1 | [@vainplex/openclaw-nats-eventstore](https://github.com/alberthild/openclaw-nats-eventstore) | 0.2.1 | 60 | NATS JetStream event persistence |
+| 2 | [@vainplex/openclaw-cortex](https://github.com/alberthild/openclaw-cortex) | 0.4.2 | 756 | Boot context, threads, decisions, trace analysis |
+| 3 | [@vainplex/openclaw-governance](https://github.com/alberthild/openclaw-governance) | 0.3.2 | 402 | Policy engine, trust scores, credential guard |
+| 4 | [@vainplex/openclaw-knowledge-engine](https://github.com/alberthild/openclaw-knowledge-engine) | 0.1.4 | 94 | LanceDB knowledge extraction + search |
+| 5 | **@vainplex/openclaw-membrane** | **0.3.0** | **44** | **Membrane episodic memory bridge** |
 
 ## License
 
