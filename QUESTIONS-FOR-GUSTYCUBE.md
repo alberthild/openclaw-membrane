@@ -1,6 +1,6 @@
 # Questions for GustyCube — OpenClaw Membrane Plugin
 
-Hey Bennett! We're building a clean OpenClaw wrapper plugin for Membrane — just store, query, retrieve. No cross-repo wiring, that's a later step. Three questions before we start coding:
+Hey! We're building a clean OpenClaw wrapper plugin for Membrane — just store, query, retrieve. No cross-repo wiring, that's a later step. Three questions before we start coding:
 
 ---
 

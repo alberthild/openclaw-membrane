@@ -233,13 +233,9 @@ npx vitest --watch    # Watch mode
 
 ## Membrane — Credit & Collaboration
 
-This plugin bridges [GustyCube/membrane](https://github.com/GustyCube/membrane), created by **Bennett Schwartz** ([@GustyCube](https://github.com/GustyCube)).
-
-Membrane is the memory substrate — a Go-based gRPC service (7.2k LOC) implementing biological memory dynamics: episodic timeline, semantic facts, competence learning, working memory, salience decay, and revision operations (supersede/fork/retract/contest/merge). The [RFC specification](https://github.com/GustyCube/membrane/blob/main/RFC.md) (849 lines) is one of the best-documented agent memory specs we've seen.
+This plugin bridges [GustyCube/membrane](https://github.com/GustyCube/membrane) — a Go-based gRPC service (7.2k LOC) implementing biological memory dynamics: episodic timeline, semantic facts, competence learning, working memory, salience decay, and revision operations (supersede/fork/retract/contest/merge). The [RFC specification](https://github.com/GustyCube/membrane/blob/main/RFC.md) (849 lines) is one of the best-documented agent memory specs out there.
 
 This plugin is the **bridge layer** — it handles OpenClaw event mapping, buffered ingestion, search tooling, and context injection. Membrane does the heavy lifting on storage, decay math, and memory consolidation.
-
-We're exploring joint development with GustyCube — Vainplex brings plugin infrastructure + LLM enhancement + production experience, GustyCube brings the storage backend + revision system + decay math.
 
 - **Membrane docs:** [membrane.gustycube.com](https://membrane.gustycube.com)
 - **TS Client:** `@gustycube/membrane` on npm
