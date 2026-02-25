@@ -203,7 +203,7 @@ const SEARCH_TOOL_SCHEMA = {
 const plugin = {
   id: 'openclaw-membrane',
   name: '@vainplex/openclaw-membrane',
-  version: '0.3.1',
+  version: '0.3.2',
 
   register(api: PluginApi) {
     const config = createConfig(api.pluginConfig);
@@ -218,10 +218,22 @@ const plugin = {
 
     logger.info(`[membrane] Registered bridge to ${config.grpc_endpoint}`);
 
-    // Write path: subscribe to events
-    api.on('event', (event: unknown) => {
-      handleEvent(event as Parameters<typeof handleEvent>[0], config, reliability, logger);
-    });
+    // Write path: subscribe to specific OpenClaw hooks
+    // OpenClaw fires named hooks, not a generic 'event' hook
+    const hookHandler = (type: string) => (event: unknown, ctx?: unknown) => {
+      const e = event as Record<string, unknown>;
+      const c = ctx as Record<string, unknown> | undefined;
+      handleEvent(
+        { type, payload: e, context: c },
+        config, reliability, logger
+      );
+    };
+
+    api.on('message_received', hookHandler('message_received'));
+    api.on('message_sent', hookHandler('message_sent'));
+    api.on('message_sending', hookHandler('message_sending'));
+    api.on('after_tool_call', hookHandler('after_tool_call'));
+    api.on('session_start', hookHandler('session_start'));
 
     // Search tool: gRPC Retrieve (boosts salience via rehearsal)
     api.registerTool({

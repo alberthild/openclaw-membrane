@@ -141,6 +141,7 @@ export function mapEvent(event: OpenClawEvent, sensitivity: string): MappedEvent
     case 'message_received':
       return mapMessageReceived(event.payload, timestamp, sensitivity);
     case 'message_sent':
+    case 'message_sending':
       return mapMessageSent(event.payload, timestamp, sensitivity);
     case 'session_start':
       return mapSessionStart(timestamp, sensitivity);
