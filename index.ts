@@ -203,7 +203,7 @@ const SEARCH_TOOL_SCHEMA = {
 const plugin = {
   id: 'openclaw-membrane',
   name: '@vainplex/openclaw-membrane',
-  version: '0.3.0',
+  version: '0.3.1',
 
   register(api: PluginApi) {
     const config = createConfig(api.pluginConfig);

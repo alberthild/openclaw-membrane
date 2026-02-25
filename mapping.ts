@@ -3,6 +3,8 @@
  * Each event type has its own mapping function.
  */
 
+import { randomUUID } from 'crypto';
+
 export interface OpenClawEvent {
   type: string;
   payload: Record<string, unknown>;
@@ -54,6 +56,7 @@ function mapMessageReceived(payload: Record<string, unknown>, timestamp: string,
     payload: {
       source: 'openclaw',
       event_kind: 'user_message',
+      ref: `msg-recv-${randomUUID()}`,
       summary: typeof payload.content === 'string' ? payload.content : '',
       timestamp,
       sensitivity,
@@ -67,6 +70,7 @@ function mapMessageSent(payload: Record<string, unknown>, timestamp: string, sen
     payload: {
       source: 'openclaw',
       event_kind: 'assistant_message',
+      ref: `msg-sent-${randomUUID()}`,
       summary: typeof payload.content === 'string' ? payload.content : '',
       timestamp,
       sensitivity,
@@ -80,6 +84,7 @@ function mapSessionStart(timestamp: string, sensitivity: string): MappedEvent {
     payload: {
       source: 'openclaw',
       event_kind: 'session_init',
+      ref: `session-${randomUUID()}`,
       summary: 'New session started',
       timestamp,
       sensitivity,
