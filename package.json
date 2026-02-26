@@ -1,6 +1,6 @@
 {
   "name": "@vainplex/openclaw-membrane",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "type": "module",
   "description": "Membrane gRPC bridge for OpenClaw — episodic memory ingestion, search tool, and auto-context injection via Membrane sidecar",
   "main": "dist/index.js",
