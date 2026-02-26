@@ -232,7 +232,9 @@ const plugin = {
     api.on('message_received', hookHandler('message_received'));
     api.on('message_sent', hookHandler('message_sent'));
     api.on('message_sending', hookHandler('message_sending'));
-    api.on('after_tool_call', hookHandler('after_tool_call'));
+    // after_tool_call removed — tool calls are operational logs, not memories.
+    // They flood Membrane (~95% of volume) and drown out actual conversations.
+    // Tool data is already captured in NATS event store.
     api.on('session_start', hookHandler('session_start'));
 
     // Search tool: gRPC Retrieve (boosts salience via rehearsal)
