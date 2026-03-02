@@ -1,5 +1,8 @@
 # @vainplex/openclaw-membrane
 
+[![npm](https://img.shields.io/npm/v/@vainplex/openclaw-membrane)](https://www.npmjs.com/package/@vainplex/openclaw-membrane)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Membrane gRPC bridge for OpenClaw — persistent episodic memory via [GustyCube/membrane](https://github.com/GustyCube/membrane) sidecar.
 
 **What it does:** Every conversation, tool call, and decision flows into Membrane's biological memory model. Memories decay over time. Frequently accessed ones grow stronger. Your agent remembers what matters and forgets what doesn't.
