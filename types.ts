@@ -96,6 +96,7 @@ export type MembranePayload = EpisodicPayload | SemanticPayload | CompetencePayl
 export interface MembraneRecord {
   id: string;
   type: string;
+  source?: string;
   sensitivity: string;
   confidence: number;
   salience: number;

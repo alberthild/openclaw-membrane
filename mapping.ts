@@ -134,24 +134,37 @@ function mapTaskCompleted(payload: Record<string, unknown>, timestamp: string): 
 
 // --- Main dispatcher ---
 
-export function mapEvent(event: OpenClawEvent, sensitivity: string): MappedEvent | null {
+export function mapEvent(event: OpenClawEvent, sensitivity: string, agentId: string = 'main'): MappedEvent | null {
   const timestamp = new Date().toISOString();
+  const source = `openclaw-${agentId}`;
 
+  let mapped: MappedEvent | null;
   switch (event.type) {
     case 'message_received':
-      return mapMessageReceived(event.payload, timestamp, sensitivity);
+      mapped = mapMessageReceived(event.payload, timestamp, sensitivity);
+      break;
     case 'message_sent':
     case 'message_sending':
-      return mapMessageSent(event.payload, timestamp, sensitivity);
+      mapped = mapMessageSent(event.payload, timestamp, sensitivity);
+      break;
     case 'session_start':
-      return mapSessionStart(timestamp, sensitivity);
+      mapped = mapSessionStart(timestamp, sensitivity);
+      break;
     case 'after_tool_call':
-      return mapToolCall(event.payload, timestamp, sensitivity);
+      mapped = mapToolCall(event.payload, timestamp, sensitivity);
+      break;
     case 'fact_extracted':
-      return mapFactExtracted(event.payload, timestamp, sensitivity);
+      mapped = mapFactExtracted(event.payload, timestamp, sensitivity);
+      break;
     case 'task_completed':
-      return mapTaskCompleted(event.payload, timestamp);
+      mapped = mapTaskCompleted(event.payload, timestamp);
+      break;
     default:
       return null;
   }
+
+  if (mapped) {
+    mapped.payload.source = source;
+  }
+  return mapped;
 }

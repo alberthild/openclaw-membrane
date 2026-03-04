@@ -134,7 +134,7 @@ async function handleContextInjection(
     const result = await retrieveMemories(client, prompt, config, fetchLimit, agentId);
     if (!result?.records?.length) return undefined;
 
-    const parsed = parseMembraneRecords(result.records, logger);
+    const parsed = parseMembraneRecords(result.records, logger, agentId);
     const memories = selectMemories(parsed, config.retrieve_limit);
     if (memories.length === 0) return undefined;
 
@@ -161,7 +161,8 @@ function handleEvent(
   event: { type: string; payload?: Record<string, unknown>; data?: Record<string, unknown>; context?: Record<string, unknown> },
   config: PluginConfig,
   reliability: ReliabilityManager,
-  logger: PluginLogger
+  logger: PluginLogger,
+  agentId: string = 'main'
 ): void {
   const normalizedEvent: OpenClawEvent = {
     type: event.type,
@@ -170,10 +171,10 @@ function handleEvent(
   };
 
   const sensitivity = mapSensitivity(normalizedEvent, config.default_sensitivity);
-  const mapped = mapEvent(normalizedEvent, sensitivity);
+  const mapped = mapEvent(normalizedEvent, sensitivity, agentId);
 
   if (mapped) {
-    logger.info(`[membrane] Received event: ${event.type}`);
+    logger.info(`[membrane] Received event: ${event.type} (agent=${agentId})`);
     reliability.enqueue(mapped.method as IngestMethod, mapped.payload as Record<string, unknown>);
   }
 }
@@ -226,9 +227,11 @@ const plugin = {
     const hookHandler = (type: string) => (event: unknown, ctx?: unknown) => {
       const e = event as Record<string, unknown>;
       const c = ctx as Record<string, unknown> | undefined;
+      const hookCtx = ctx as { agentId?: string } | undefined;
+      const agentId = hookCtx?.agentId || 'main';
       handleEvent(
         { type, payload: e, context: c },
-        config, reliability, logger
+        config, reliability, logger, agentId
       );
     };
 
@@ -257,9 +260,11 @@ const plugin = {
                 .join('\n')
             : '';
         if (!content || content.length < 10) break;
+        const endCtx = ctx as { agentId?: string } | undefined;
+        const endAgentId = endCtx?.agentId || 'main';
         handleEvent(
           { type: 'message_sent', payload: { content }, context: ctx as Record<string, unknown> | undefined },
-          config, reliability, logger
+          config, reliability, logger, endAgentId
         );
         break; // Only the last one
       }

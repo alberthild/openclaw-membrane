@@ -14,22 +14,38 @@ const MAX_SUMMARY_LENGTH = 500;
 
 /**
  * Parse raw Membrane Retrieve records into categorized, formatted memory strings.
+ * When agentId is provided, filters records to only include those from the same agent.
+ * Records without a source tag (legacy) are included for backwards compatibility.
  */
 export function parseMembraneRecords(
   rawRecords: Uint8Array[],
-  logger?: PluginLogger
+  logger?: PluginLogger,
+  agentId?: string
 ): ParsedMemories {
   const conversational: string[] = [];
   const tool: string[] = [];
+  const expectedSource = agentId ? `openclaw-${agentId}` : undefined;
+  let filtered = 0;
 
   for (const raw of rawRecords) {
     try {
       const record: MembraneRecord = JSON.parse(Buffer.from(raw).toString());
+
+      // Client-side agent isolation: skip records from other agents
+      if (expectedSource && record.source && record.source !== expectedSource && record.source !== 'openclaw') {
+        filtered++;
+        continue;
+      }
+
       const tsShort = formatTimestamp(record.created_at);
       parsePayload(record, tsShort, conversational, tool);
     } catch (err) {
       logger?.debug(`[membrane] Failed to parse record: ${err instanceof Error ? err.message : String(err)}`);
     }
+  }
+
+  if (filtered > 0) {
+    logger?.debug(`[membrane] Filtered ${filtered} records from other agents (keeping source=${expectedSource})`);
   }
 
   return { conversational, tool };

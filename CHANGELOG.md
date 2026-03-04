@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.7] — 2026-03-04
+
+### Fixed
+- **Full agent memory isolation (client-side filtering).** Server-side scope filters in `membraned` are not enforced, so v0.3.6's retrieval scoping alone was insufficient. Now:
+  - **Ingest:** Events tagged with `source: openclaw-{agentId}` (was always `openclaw`).
+  - **Retrieve:** Client-side filter in `parseMembraneRecords()` drops records from other agents. Legacy records (source=`openclaw`) pass through for backwards compatibility.
+  - Agents can no longer see each other's conversation history in Membrane context injection.
+
 ## [0.3.6] — 2026-03-04
 
 ### Fixed
