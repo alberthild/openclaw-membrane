@@ -52,15 +52,16 @@ async function retrieveMemories(
   client: MembraneClient,
   query: string,
   config: PluginConfig,
-  fetchLimit: number
+  fetchLimit: number,
+  agentId: string = 'main'
 ): Promise<RetrieveResponse | null> {
   const request: RetrieveRequest = {
     task_descriptor: query.substring(0, 500),
     trust: {
       max_sensitivity: config.retrieve_max_sensitivity,
       authenticated: true,
-      actor_id: 'openclaw-main',
-      scopes: [],
+      actor_id: `openclaw-${agentId}`,
+      scopes: [agentId],
     },
     memory_types: [],
     min_salience: config.retrieve_min_salience,
@@ -123,13 +124,14 @@ async function handleContextInjection(
   client: MembraneClient,
   config: PluginConfig,
   logger: PluginLogger,
-  prompt: string
+  prompt: string,
+  agentId: string = 'main'
 ): Promise<{ prependContext: string } | undefined> {
   if (!prompt || prompt.length < 5) return undefined;
 
   try {
     const fetchLimit = Math.max(config.retrieve_limit * 10, 50);
-    const result = await retrieveMemories(client, prompt, config, fetchLimit);
+    const result = await retrieveMemories(client, prompt, config, fetchLimit, agentId);
     if (!result?.records?.length) return undefined;
 
     const parsed = parseMembraneRecords(result.records, logger);
@@ -279,9 +281,11 @@ const plugin = {
 
     // Context hook: auto-inject Membrane memories before agent starts
     if (config.retrieve_enabled) {
-      api.on('before_agent_start', (event: unknown) => {
+      api.on('before_agent_start', (event: unknown, ctx?: unknown) => {
         const e = event as { prompt?: string; message?: string };
-        return handleContextInjection(client, config, logger, e.prompt || e.message || '');
+        const hookCtx = ctx as { agentId?: string } | undefined;
+        const agentId = hookCtx?.agentId || 'main';
+        return handleContextInjection(client, config, logger, e.prompt || e.message || '', agentId);
       });
     }
 

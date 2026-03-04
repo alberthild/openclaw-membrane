@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.3.6] — 2026-03-04
+
+### Fixed
+- **Agent-scoped memory retrieval.** Membrane now passes `agentId` from hook context to retrieval queries. Each agent only retrieves its own memories instead of seeing all agents' conversations. Prevents cross-agent memory injection in multi-agent setups. `actor_id` is set to `openclaw-{agentId}` and `scopes` filters by agent.
+
 ## [0.3.5] — 2026-03-04
 
 ### Fixed
