@@ -232,6 +232,36 @@ const plugin = {
     api.on('message_received', hookHandler('message_received'));
     api.on('message_sent', hookHandler('message_sent'));
     api.on('message_sending', hookHandler('message_sending'));
+
+    // Workaround: message_sent hook doesn't fire from gateway delivery pipeline
+    // in OpenClaw v2026.3.x. Use agent_end to capture assistant messages instead.
+    // Only captures the LAST assistant message to avoid flooding with entire history.
+    // TODO: Remove when upstream fixes plugin hook bridging. PR: openclaw/openclaw#XXX
+    api.on('agent_end', (event: unknown, ctx?: unknown) => {
+      const e = event as Record<string, unknown>;
+      if (!e.success || !e.messages) return;
+      const messages = e.messages as Array<Record<string, unknown>>;
+      // Find the LAST assistant message only (not entire history)
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const msg = messages[i];
+        if (msg.role !== 'assistant') continue;
+        const content = typeof msg.content === 'string'
+          ? msg.content
+          : Array.isArray(msg.content)
+            ? (msg.content as Array<Record<string, unknown>>)
+                .filter((b: Record<string, unknown>) => b.type === 'text' && typeof b.text === 'string')
+                .map((b: Record<string, unknown>) => b.text as string)
+                .join('\n')
+            : '';
+        if (!content || content.length < 10) break;
+        handleEvent(
+          { type: 'message_sent', payload: { content }, context: ctx as Record<string, unknown> | undefined },
+          config, reliability, logger
+        );
+        break; // Only the last one
+      }
+    });
+
     // after_tool_call removed — tool calls are operational logs, not memories.
     // They flood Membrane (~95% of volume) and drown out actual conversations.
     // Tool data is already captured in NATS event store.

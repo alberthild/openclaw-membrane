@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.3.4] — 2026-03-04
+
+### Fixed
+- **Assistant messages now captured in Membrane.** Added `agent_end` hook workaround for `message_sent` not firing from gateway delivery pipeline in OpenClaw v2026.3.x. Only captures the last assistant message per turn (avoids flooding with entire conversation history).
+- **Removed `after_tool_call` hook.** Tool calls are operational logs (~95% of Membrane volume) and drown out actual conversations. Tool data is already captured in the NATS event store.
+
 ## [0.3.0] — 2026-02-23
 
 ### Added
