@@ -1,0 +1,10 @@
+{
+  "grpc_endpoint": "localhost:50052",
+  "buffer_size": 1000,
+  "default_sensitivity": "low",
+  "retrieve_enabled": true,
+  "retrieve_limit": 5,
+  "retrieve_min_salience": 0.1,
+  "retrieve_max_sensitivity": "medium",
+  "retrieve_timeout_ms": 30000
+}

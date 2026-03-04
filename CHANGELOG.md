@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.3.5] — 2026-03-04
+
+### Fixed
+- **validateConfig crash when no config block exists.** `validateConfig(rawConfig)` threw when `rawConfig` was `undefined` (no explicit `openclaw-membrane` config in openclaw.json). Now gracefully defaults to `{}`. (Thanks @Oo__Abe__oO)
+
 ## [0.3.4] — 2026-03-04
 
 ### Fixed

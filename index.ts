@@ -32,7 +32,8 @@ export function createConfig(rawConfig: Record<string, unknown>): PluginConfig {
   };
 }
 
-export function validateConfig(raw: Record<string, unknown>): Partial<PluginConfig> {
+export function validateConfig(raw: Record<string, unknown> | undefined): Partial<PluginConfig> {
+  if (!raw) return {};
   const result: Partial<PluginConfig> = {};
   if (typeof raw.grpc_endpoint === 'string') result.grpc_endpoint = raw.grpc_endpoint;
   if (typeof raw.buffer_size === 'number') result.buffer_size = raw.buffer_size;
