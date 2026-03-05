@@ -1,3 +1,8 @@
+// Protocol Buffer definitions for Membrane gRPC API
+// Original source: https://github.com/GustyCube/membrane
+// Copyright (c) GustyCube — MIT License
+// See https://github.com/GustyCube/membrane/blob/main/LICENSE
+
 syntax = "proto3";
 
 package membrane.v1;

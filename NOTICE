@@ -1,0 +1,11 @@
+Third-Party Notices
+====================
+
+This project includes Protocol Buffer definitions from:
+
+  Membrane by GustyCube
+  https://github.com/GustyCube/membrane
+  Licensed under the MIT License
+  Copyright (c) GustyCube
+
+  Files: assets/proto/membrane/v1/membrane.proto
