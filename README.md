@@ -1,3 +1,7 @@
+> **Part of [Brainplex](https://npmjs.com/package/brainplex)** — The intelligence layer for AI agents. `npx brainplex init` to install the full suite.
+
+---
+
 # @vainplex/openclaw-membrane
 
 [![npm](https://img.shields.io/npm/v/@vainplex/openclaw-membrane)](https://www.npmjs.com/package/@vainplex/openclaw-membrane)
